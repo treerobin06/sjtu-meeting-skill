@@ -1,115 +1,81 @@
 # SJTU Meeting Skill
 
-用于上海交通大学云视频会议平台 `meeting.sjtu.edu.cn` 的 Agent Skill 和 Python CLI。
+用自然语言管理上海交通大学云视频会议平台 `meeting.sjtu.edu.cn`。
 
-它不模拟浏览器表单，而是直接调用平台后端 API，帮助 agent 或用户脚本完成会议查询、创建、批量创建、删除、获取腾讯会议入会链接、查询占用时段和日历视图等操作。
+这个仓库的核心不是让用户手动运行一堆命令，而是提供一个 Agent Skill：用户只需要和自己的 agent 对话，例如“下周三晚上 7 点帮我建个组会”“把明天那个会的腾讯入会链接发我”，agent 会把自然语言请求翻译成后端 API 操作，并返回会议号、入会链接或确认清单。
 
-## 功能概览
+## 能用自然语言做什么
 
-- 查询未来或历史会议列表。
-- 获取单个会议详情，包括腾讯会议入会链接、会议号、密码、主持人、联席主持人、直播链接等。
-- 创建单个会议，支持主题、日期、时间、时长、会议室组、密码、联席主持人。
-- 从 JSON 批量创建会议，默认并发 4。
-- 按每周固定模板展开 recurring meetings，并支持 dry-run 预览。
-- 按内部会议 ID 删除会议。
-- 查询某天某会议室组的半小时占用状态。
-- 查询 day / week / month 日历视图。
-- 验证当前 `user_token` 是否有效。
+你可以直接对 agent 说：
 
-## 为什么做这个工具
+- “帮我看看接下来一周有哪些会议。”
+- “下周三晚上 7 点建一个论文讨论会，开 2 小时，密码默认。”
+- “明天下午 3 点约个项目同步会，拉 alice,bob 做联席主持。”
+- “把 9 月开始连续 16 周的每周组会排上，先给我预览。”
+- “我下一场会的腾讯会议链接和会议号发我。”
+- “删掉 6 月 9 日晚上那个测试会，先列出来让我确认。”
+- “查一下 6 月 12 日 300 人会议室组哪些时段空。”
+- “把这个月所有 seminar 会议列出来。”
+
+agent 会负责：
+
+- 理解相对日期和时间，例如“下周三”“明天下午”“这学期每周二”。
+- 检查平台约束，例如开始时间必须是整点或半点。
+- 创建会议后直接返回腾讯会议入会链接和会议号。
+- 批量创建前先 dry-run 给用户确认。
+- 删除前先列出候选会议 ID 和时间，避免误删。
+- 查询会议列表、详情、占用时段和日历视图。
+
+## 为什么需要这个 Skill
 
 网页 UI 适合人工创建单个会议，但对 agent 自动化不够稳定：
 
-- 浏览器表单自动化速度慢、容易受 UI 改版影响。
+- 浏览器表单自动化慢，容易受 UI 改版影响。
 - 一学期固定会议通常需要批量创建，手工重复成本高。
 - 创建接口本身会返回腾讯会议入会链接，不必逐个打开详情页复制。
-- agent 更适合消费结构化 JSON 输出，并按安全边界组合原子命令。
+- agent 更适合把自然语言请求拆成可确认的原子操作。
 
-本仓库包含：
+这个 skill 的内部实现是直接调用 `meeting.sjtu.edu.cn` 后端 API，不依赖腾讯会议 MCP，也不模拟浏览器表单。用户日常使用时不需要关心 Python 命令；这些命令只是 agent 的执行后端。
 
-- `scripts/sjtu_meeting.py`：Python CLI 主程序。
-- `SKILL.md`：给 agent 使用的 skill 说明。
-- `references/api.md`：后端接口、payload、response 和安全边界说明。
-- `docs/credential-setup.md`：登录态和凭证获取的详细说明。
-- `docs/agent-cookie-capture.zh.md`：给用户自己的 agent 自动抓取已登录浏览器 token 的中文操作手册。
+## 仓库结构
+
+- `SKILL.md`：给 agent 读取的 skill 说明，定义何时触发、如何把自然语言请求映射到操作。
+- `scripts/sjtu_meeting.py`：agent 内部使用的 Python CLI 后端。
+- `docs/agent-cookie-capture.zh.md`：用户自己的 agent 如何从已登录浏览器安全抓取 token。
+- `docs/credential-setup.md`：凭证、登录态、刷新和排障说明。
+- `docs/cli-reference.zh.md`：CLI 命令参考，主要给 agent/维护者调试用。
+- `references/api.md`：后端 API 逆向说明。
 - `assets/recurring_meetings.json`：公开示例 recurring 会议模板。
 - `examples/creds.example.json`：凭据文件示例，不包含真实 token。
 
-## 认证模型
+## 登录态和安全模型
 
-平台后端接受一个 `user_token`。实测在不带浏览器 cookie 的情况下，只要把这个 token 带到 API 请求里，也可以访问当前用户自己的会议数据。
+这个工具不需要用户把 jAccount 账号密码交给 agent。
 
-CLI 会把 token 同时放在两个位置：
+推荐流程是：
 
-- HTTP header：`user-token: <token>`
-- 表单 body：`user_token=<token>`
+1. 用户自己在浏览器打开 `https://meeting.sjtu.edu.cn`。
+2. 用户自己完成学校官方 SSO 登录。
+3. 用户授权自己的 agent 访问这个已登录浏览器的页面上下文。
+4. agent 只读取 `meeting.sjtu.edu.cn` 这个 origin 的 `user_info` cookie。
+5. agent 只保存其中的 `token` 字段到本机凭据文件。
+6. agent 用该 token 调用会议平台 API。
 
-token 来源于用户已经登录 `meeting.sjtu.edu.cn` 后，浏览器里的 `user_info` cookie。这个仓库不包含账号密码、cookie 或真实 token。
+这种方式的安全边界比较清楚：
 
-这种方式的安全性来自几个边界：
+- 不保存、不传输、不代填 jAccount 账号密码。
+- 用户始终在学校官方 SSO 页面自己登录。
+- agent 只是复用用户已经登录好的浏览器会话。
+- token 保存在用户本机，建议文件权限为 `600`。
+- token 是会话型凭据，不是账号密码。
+- token 过期后没有额外问题，用户重新登录 `meeting.sjtu.edu.cn`，agent 再抓一次 token 即可。
+- 本地凭据文件可以随时删除，相当于撤销这个工具在本机的访问能力。
 
-- 不保存、不传输、不代填 jAccount 账号密码；用户始终在学校官方 SSO 页面自己登录。
-- agent 只读取登录后 `meeting.sjtu.edu.cn` 这个站点自己的 `user_info` cookie，并且只保存其中的 `token` 字段。
-- token 保存在用户本机的本地文件里，建议权限为 `600`，不会进入仓库。
-- token 是会话型凭据。它过期后不会影响账号本身，只需要用户重新在浏览器登录一次，再让 agent 重新抓取 token 即可。
+真正需要保护的是 token 本身：不要把它打印到聊天、日志、issue、commit、截图或公开文档里。
 
-换句话说，这不是“把账号密码交给脚本”，而是“复用用户已经登录好的浏览器会话”。只要不把 token 打印到公开日志、issue、commit 或聊天记录里，这种方式比保存账号密码更可控，也更适合本地 agent 自动化。
+## 给用户复制给 Agent 的提示词
 
-凭据读取顺序：
-
-1. 命令行参数 `--token`
-2. 环境变量 `SJTU_MEETING_TOKEN`
-3. 本地凭据 JSON 文件
-
-默认凭据文件：
-
-```text
-~/.config/sjtu-meeting/creds.json
-```
-
-也可以用环境变量改路径：
-
-```bash
-export SJTU_MEETING_CREDS=/path/to/creds.json
-```
-
-最小凭据文件：
-
-```json
-{
-  "user_token": "paste-token-here",
-  "default_group_id": 14,
-  "default_cohost": "",
-  "default_password": "000000"
-}
-```
-
-建议权限：
-
-```bash
-mkdir -p ~/.config/sjtu-meeting
-chmod 700 ~/.config/sjtu-meeting
-chmod 600 ~/.config/sjtu-meeting/creds.json
-```
-
-## 给陌生用户和 Agent 的凭证设置流程
-
-推荐流程是“用户自己登录，agent 只读取授权后的浏览器登录态”，不需要把 jAccount 密码交给 agent。详细版见 [docs/agent-cookie-capture.zh.md](docs/agent-cookie-capture.zh.md)。
-
-前提：
-
-- 用户本机已经有浏览器，并且 agent 有权限访问这个浏览器或它的调试接口。
-- 用户已经在该浏览器里登录 `https://meeting.sjtu.edu.cn`，或者愿意在 agent 提示后手动登录。
-- agent 必须 attach 到用户已有登录态的浏览器/profile；如果开的是全新无状态浏览器，就拿不到 cookie。
-
-1. 用户在自己的浏览器打开 `https://meeting.sjtu.edu.cn`。
-2. 用户自己完成 SJTU SSO 登录。
-3. 用户授权 agent 读取当前页面同源的 `user_info` cookie。
-4. agent 只提取其中的 JSON 字段 `token`。
-5. agent 把 token 写入本地凭据文件，并设置文件权限为 `600`。
-6. agent 运行 `whoami` 验证 token 是否有效。
-
-可以给 agent 的提示词：
+如果你的 agent 已经能访问浏览器，例如 Browser Use、Computer Use、Chrome/Edge DevTools、Playwright MCP、浏览器调试端口或类似插件，可以直接对 agent 说：
 
 ```text
 我已经在本机浏览器登录 https://meeting.sjtu.edu.cn，并允许你访问这个已登录浏览器的页面上下文。
@@ -117,299 +83,42 @@ chmod 600 ~/.config/sjtu-meeting/creds.json
 如果页面没有登录，请停下来让我手动登录；不要问我要 jAccount 密码。
 登录后，只在 https://meeting.sjtu.edu.cn 这个 origin 中读取 user_info cookie，解析其中的 token 字段。
 不要在聊天、日志、commit、issue 或最终回复中打印 token。
-把 token 写入 ~/.config/sjtu-meeting/creds.json，权限设为 600，然后运行 `python3 scripts/sjtu_meeting.py whoami` 验证。
+把 token 写入 ~/.config/sjtu-meeting/creds.json，权限设为 600，然后验证会议 API 是否可用。
 最终只告诉我验证是否成功，以及识别到的非敏感账号信息；不要回显 token。
 ```
 
-agent 在浏览器页面上下文中执行的核心 JS：
+agent 的执行原则：
 
-```js
-(() => {
-  if (location.hostname !== "meeting.sjtu.edu.cn") {
-    throw new Error(`wrong origin: ${location.origin}`);
-  }
-  const m = document.cookie.match(/(?:^|;\s*)user_info=([^;]+)/);
-  if (!m) throw new Error("user_info cookie not found; log in to meeting.sjtu.edu.cn first");
-  let o = JSON.parse(decodeURIComponent(m[1]));
-  if (typeof o === "string") o = JSON.parse(o);
-  if (!o.token) throw new Error("token not found in user_info cookie");
-  return {
-    token: o.token,
-    profile: {
-      name: o.name || "",
-      user_id: o.user_id || "",
-      email: o.email || "",
-      allow_room_group: o.allow_room_group || []
-    }
-  };
-})()
-```
+- 必须 attach 到用户已有登录态的浏览器/profile；新开的无状态浏览器通常没有 cookie。
+- 只在 `meeting.sjtu.edu.cn` 页面上下文读取 `user_info` cookie。
+- 如果还在 SSO 登录页，停下来让用户自己登录，不要索要密码。
+- 写入本地凭据文件后，只汇报验证结果，不回显 token。
 
-agent 只需要把返回对象里的 `token` 写入 `~/.config/sjtu-meeting/creds.json`；`profile` 只是用于本地核对，不应包含在公开日志里。
+详细的浏览器 token 抓取流程见 [docs/agent-cookie-capture.zh.md](docs/agent-cookie-capture.zh.md)。
 
-Agent 推荐执行清单：
+## Agent 如何使用这个 Skill
 
-1. 连接用户已有登录态的浏览器/profile。
-2. 打开或定位到 `https://meeting.sjtu.edu.cn`。
-3. 检查当前页面 origin，必须是 `https://meeting.sjtu.edu.cn`。
-4. 如果页面跳到 SJTU SSO 或显示未登录，停下来让用户自己完成登录。
-5. 用户登录完成后，回到 `meeting.sjtu.edu.cn` 页面。
-6. 在该页面上下文执行上面的 cookie 解析 JS。
-7. 只保留 `token` 字段；`name`、`user_id`、`email`、`allow_room_group` 只用于本地核对。
-8. 创建 `~/.config/sjtu-meeting`，权限 `700`。
-9. 写入 `~/.config/sjtu-meeting/creds.json`，权限 `600`。
-10. 运行 `python3 scripts/sjtu_meeting.py whoami`。
-11. 验证成功后只汇报成功和非敏感账号信息，不回显 token。
+面向 agent 的入口是 [SKILL.md](SKILL.md)。
 
-```json
-{
-  "user_token": "paste-token-here",
-  "default_group_id": 14,
-  "default_cohost": "",
-  "default_password": "000000"
-}
-```
+agent 看到用户要求在 SJTU 云视频会议平台上创建、查询、删除或批量安排会议时，应触发这个 skill。典型流程是：
 
-验证：
+1. 解析用户自然语言，确定操作类型、日期、时间、时长、主题、会议室组、联席主持人等。
+2. 如果是批量创建或删除，先生成清单让用户确认。
+3. 调用内部 CLI/API 完成操作。
+4. 返回用户真正关心的结果，例如会议号、腾讯入会链接、创建成功数、删除结果或占用时段。
 
-```bash
-chmod 600 ~/.config/sjtu-meeting/creds.json
-python3 scripts/sjtu_meeting.py whoami
-```
-
-常见坑：
-
-- agent 打开了全新无状态浏览器：这种浏览器没有用户登录态，通常拿不到 cookie。应 attach 到用户正在使用的浏览器/profile，或让用户在 agent 打开的浏览器里手动登录。
-- 页面还停在 SJTU SSO：不要让 agent 输入账号密码，让用户自己完成登录。
-- cookie 读不到：确认当前页面是 `https://meeting.sjtu.edu.cn`，并且登录后的会议平台页面已经加载完成。
-- token 被打印到日志：有些浏览器 evaluate 工具会把返回值写进工具日志。高敏感场景下，改用手动控制台方式，或使用可信本地 agent。
-
-安全边界：
-
-- 只允许读取用户自己授权的、自己账号的已登录浏览器。
-- 只读取 `meeting.sjtu.edu.cn` 这个 origin 的 `user_info` cookie。
-- 不要读取他人浏览器、他人账号或未授权 profile。
-- 不要向用户索要 jAccount 密码。
-- 不要在聊天、日志、issue、commit、截图中公开 token。
-- 不要把真实 `creds.json` 提交到仓库。
-
-更详细的凭证设置、刷新和排障说明见 [docs/credential-setup.md](docs/credential-setup.md) 和 [docs/agent-cookie-capture.zh.md](docs/agent-cookie-capture.zh.md)。
-
-## 安装和运行
-
-推荐使用 `uv`：
-
-```bash
-uv run python3 scripts/sjtu_meeting.py whoami
-```
-
-或者在当前 Python 环境安装依赖：
-
-```bash
-uv pip install httpx
-python3 scripts/sjtu_meeting.py whoami
-```
-
-运行依赖只有 `httpx`。
-
-## 命令说明
-
-### 验证凭据
-
-```bash
-python3 scripts/sjtu_meeting.py whoami
-python3 scripts/sjtu_meeting.py whoami --json
-```
-
-### 列出会议
-
-默认查询从今天起未来一年的会议：
-
-```bash
-python3 scripts/sjtu_meeting.py list
-python3 scripts/sjtu_meeting.py list --from 2026-06-01 --to 2026-06-30
-python3 scripts/sjtu_meeting.py list --search "seminar" --json
-python3 scripts/sjtu_meeting.py list --all
-```
-
-### 获取会议详情
-
-`id` 来自 `list` 命令返回的内部会议 ID：
-
-```bash
-python3 scripts/sjtu_meeting.py get 123456
-python3 scripts/sjtu_meeting.py get 123456 --json
-```
-
-详情中会包含 `join_url`，即腾讯会议入会链接。
-
-### 创建单个会议
-
-```bash
-python3 scripts/sjtu_meeting.py create \
-  --topic "Weekly Seminar" \
-  --date 2026-06-09 \
-  --time 19:00 \
-  --duration 3 \
-  --group 14 \
-  --cohost alice,bob
-```
-
-`duration` 支持小时或分钟：
-
-- `3`
-- `0.5`
-- `90m`
-
-开始时间必须是整点或半点，即 `HH:00` 或 `HH:30`。
-
-### 批量创建会议
-
-准备 `meetings.json`：
-
-```json
-[
-  {"topic": "Weekly Seminar", "date": "2026-06-09", "time": "19:00", "duration": 3, "cohost": "alice,bob"},
-  {"topic": "Weekly Seminar", "date": "2026-06-16", "time": "19:00", "duration": 3, "cohost": "alice,bob"}
-]
-```
-
-运行：
-
-```bash
-python3 scripts/sjtu_meeting.py create --batch meetings.json --json
-```
-
-批量创建默认使用 4 个线程并发。
-
-### 固定周会模板
-
-编辑 `assets/recurring_meetings.json`，或用环境变量指定自己的模板：
-
-```bash
-export SJTU_MEETING_RECURRING=/path/to/recurring_meetings.json
-```
-
-先预览：
-
-```bash
-python3 scripts/sjtu_meeting.py recurring --start 2026-09-07 --dry-run
-```
-
-确认清单后再真正创建：
-
-```bash
-python3 scripts/sjtu_meeting.py recurring --start 2026-09-07
-```
-
-常用参数：
-
-```bash
-python3 scripts/sjtu_meeting.py recurring --start 2026-09-07 --weeks 16
-python3 scripts/sjtu_meeting.py recurring --start 2026-09-07 --only WEEKLY_SEMINAR
-python3 scripts/sjtu_meeting.py recurring --start 2026-09-07 --all-templates
-```
-
-模板里的 weekday 编码是 `0 = 周日, 1 = 周一, ..., 6 = 周六`。
-
-### 删除会议
-
-删除不可逆。建议先 `list` 查出候选会议，确认 ID 后再删。
-
-```bash
-python3 scripts/sjtu_meeting.py delete 123456
-python3 scripts/sjtu_meeting.py delete 123456 123457 --json
-```
-
-### 查询时段占用
-
-```bash
-python3 scripts/sjtu_meeting.py busy --date 2026-06-09 --duration 3 --group 14
-python3 scripts/sjtu_meeting.py busy --date 2026-06-09 --json
-```
-
-### 查询日历视图
-
-```bash
-python3 scripts/sjtu_meeting.py calendar --view month --date 2026-06-01
-python3 scripts/sjtu_meeting.py calendar --view week --date 2026-06-09
-python3 scripts/sjtu_meeting.py calendar --view day --date 2026-06-09
-```
-
-日历接口结构较复杂，因此 CLI 始终输出 JSON。
-
-## 实现方法
-
-### API 形态
-
-Base URL：
-
-```text
-https://meeting.sjtu.edu.cn/api/v1
-```
-
-主要接口使用：
-
-```text
-POST application/x-www-form-urlencoded
-```
-
-统一响应结构大致为：
-
-```json
-{
-  "code": 200,
-  "text": "OK",
-  "success": true,
-  "data": {}
-}
-```
-
-CLI 以 `success: true` 作为成功判断。
-
-### 已封装接口
-
-| CLI 命令 | 后端接口 | 作用 |
-|---|---|---|
-| `whoami` | `/user/incomplete` | 轻量验证 token |
-| `list` | `/meeting/list` | 查询会议列表 |
-| `get` | `/meeting/get` | 获取会议详情和入会链接 |
-| `create` | `/meeting/edit` | 创建会议，CLI 使用 `id=0` |
-| `delete` | `/meeting/delete` | 删除会议 |
-| `busy` | `/query/busy` | 查询半小时粒度的忙闲状态 |
-| `calendar` | `/query/view/day`, `/query/view/week`, `/query/view/month` | 查询日历视图 |
-
-### 创建结果解析
-
-`meeting/edit` 创建会议后，返回值里不是直接给一个结构化 `join_url` 字段，而是返回一个 notice URL。CLI 会解析这个 URL：
-
-- query 参数 `address`：腾讯会议入会链接。
-- query 参数 `content`：包含会议号。
-
-因此 `create` 命令创建完成后可以立刻打印会议号和入会链接。
-
-### 列表默认时间范围
-
-原始 `meeting/list` 接口可能返回很久以前的历史会议。CLI 默认限制为从今天起未来一年；需要历史会议时再显式传 `--all`。
+用户不需要阅读 CLI 参数。CLI 命令参考保留在 [docs/cli-reference.zh.md](docs/cli-reference.zh.md)，用于维护、调试或扩展 skill。
 
 ## 安全边界
 
-这个工具故意不封装下列接口：
+这个工具故意不封装以下危险接口：
 
 - `meeting/mail/*`：会真实发送邮件。
 - `admin/*`：管理员接口。
 - `user/clear` 以及其他带清理、重建语义的接口。
 
-agent 应该组合 CLI 暴露的原子命令，而不是绕过 CLI 直接调用危险接口。
+删除会议不可逆，所以 agent 必须先列出候选会议并让用户确认。批量创建会产生真实会议记录，所以也应先预览清单。
 
-安全注意：
-
-- `user_token` 等同于该平台的会话凭据。
-- 不要把真实 token 放进 issue、commit、截图、日志或聊天记录。
-- 不要把真实凭据文件提交到仓库。
-- 这个工具不需要 jAccount 密码；用户自己在浏览器登录即可。
-- 批量创建会产生真实会议记录，运行前应先 dry-run 或人工确认。
-
-## 仓库状态
+## 当前状态
 
 这是一个经过去敏处理的公开版本。仓库中不包含私人 token、账号密码或真实私人会议模板。
