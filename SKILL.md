@@ -1,108 +1,65 @@
 ---
 name: sjtu-meeting
 description: >
-  Manage meetings on Shanghai Jiao Tong University's meeting.sjtu.edu.cn platform by calling the backend API directly.
-  Use this skill when the user wants to list, create, batch-create, inspect, delete, or check availability for their own
-  SJTU cloud video meetings. It returns Tencent Meeting join URLs and meeting numbers without opening the web UI.
+  Manage meetings on Shanghai Jiao Tong University's meeting.sjtu.edu.cn platform from natural language.
+  Use when the user wants to list, create, batch-create, inspect, delete, or check availability for their own
+  SJTU cloud video meetings. Returns Tencent Meeting join URLs and meeting numbers without using the web UI.
 ---
 
-# SJTU Meeting Skill
+# SJTU Meeting
 
-This skill wraps the `meeting.sjtu.edu.cn` backend API with a small Python CLI. It is designed for agents that need reliable,
-scriptable access to SJTU cloud video meeting reservations without browser form automation.
+Use this skill when the user asks to manage their own meetings on `meeting.sjtu.edu.cn`.
 
-## Entry Point
+Do not use it for Tencent Meeting recordings/transcripts, meeting minutes, Feishu/Lark calendar events, Zoom, Tencent client settings, slide generation, email notifications, or public lecture lookup.
 
-```bash
-python3 scripts/sjtu_meeting.py <command> [options] [--json]
-```
+## Natural Language Routing
 
-Use `--json` when another program or agent needs structured output. Run `whoami` first to verify that the token is still valid.
+Map user requests to these operations:
 
-## Commands
-
-| User intent | Command |
+| User intent | Operation |
 |---|---|
-| List meetings, meeting numbers, status | `list` |
-| Get full join link and streaming link | `get <id>` |
-| Create one meeting or batch-create many | `create` |
-| Delete meetings | `delete <id> [id ...]` |
-| Check room-group availability | `busy --date YYYY-MM-DD --group 14` |
-| Query calendar view | `calendar --view day\|week\|month --date YYYY-MM-DD` |
-| Validate credentials | `whoami` |
-| Expand a weekly meeting template | `recurring --start YYYY-MM-DD --dry-run` |
+| “我有哪些会 / 下一场会 / 会议号” | list meetings |
+| “把入会链接发我 / 查详情” | get meeting detail |
+| “建个会 / 约个会” | create one meeting |
+| “排这学期周会 / 批量建固定会议” | preview recurring or batch create |
+| “删掉那个会” | list candidates, confirm, then delete |
+| “这个时间空不空” | check busy slots |
+| “看日历 / 本周本月会议” | calendar view |
 
-## Typical Workflows
+Return what the user cares about: meeting time, topic, internal ID when needed, Tencent join URL, meeting number, password, status, and confirmation/result summaries.
 
-- Delete meetings: run `list` first, show the candidate IDs to the user, and only then run `delete`.
-- Create a semester schedule: generate a batch JSON or use `recurring --dry-run`, show the full plan, then create after confirmation.
-- Share the next join link: run `list` for the near future, pick the relevant ID, then run `get`.
+## Workflow Rules
+
+- Convert relative dates such as “明天”, “下周三”, and “这学期每周二” to concrete dates before calling the backend.
+- Meeting start minutes must be `00` or `30`. If the user gives an invalid time, ask or round only with explicit confirmation.
+- For batch creation or recurring meetings, dry-run or show the generated schedule before creating real records.
+- Deletion is irreversible. Always list candidate meetings and ask for confirmation before deleting.
+- If the user asks for the next meeting link, list near-future meetings first, choose the relevant meeting, then get details.
 
 ## Credentials
 
-The platform API accepts a single `user_token`. The token is stored outside this repository.
+The backend uses a single `user_token` saved outside the repository. The agent should not ask for the user's jAccount password.
 
-Default credential file:
+For first-time setup:
 
-```text
-~/.config/sjtu-meeting/creds.json
-```
+1. Ask the user to open `https://meeting.sjtu.edu.cn` in their own browser and complete normal SSO login.
+2. Attach to the user's existing logged-in browser/profile, not a fresh stateless browser.
+3. Read only the `user_info` cookie from `meeting.sjtu.edu.cn`, extract only `token`, and do not print it.
+4. Save it to the local credential file with permission `600`.
+5. Verify with the CLI/backend before doing meeting operations.
 
-Override paths with:
+Read `references/agent-cookie-capture.zh.md` or `references/credential-setup.md` when setting up or refreshing credentials.
 
-```bash
-export SJTU_MEETING_CREDS=/path/to/creds.json
-export SJTU_MEETING_RECURRING=/path/to/recurring_meetings.json
-```
+## References
 
-Credential lookup order:
+- `references/cli-reference.zh.md`: CLI commands and examples for agent execution/debugging.
+- `references/api.md`: backend API payloads, responses, wrapped endpoints, and intentionally unwrapped risky endpoints.
+- `references/agent-cookie-capture.zh.md`: detailed Chinese guide for browser-capable agents to capture the logged-in token.
+- `references/credential-setup.md`: credential model, refresh, troubleshooting, and security notes.
 
-1. `--token`
-2. `SJTU_MEETING_TOKEN`
-3. `creds.json`
+## Safety
 
-Minimal `creds.json`:
-
-```json
-{
-  "user_token": "paste-token-here",
-  "default_group_id": 14,
-  "default_cohost": "",
-  "default_password": "000000"
-}
-```
-
-The token comes from the logged-in browser's `user_info` cookie on `meeting.sjtu.edu.cn`. Do not commit it.
-
-For a new user's agent setup:
-
-1. Ask the user to open `https://meeting.sjtu.edu.cn` in their own browser and complete normal SSO login themselves.
-2. Attach to the user's existing logged-in browser/profile. Do not use a fresh stateless browser.
-3. If the page is not logged in, stop and ask the user to log in manually. Do not ask for a password.
-4. In the `meeting.sjtu.edu.cn` page context only, read the `user_info` cookie and extract the `token` field.
-5. Write it to `~/.config/sjtu-meeting/creds.json` with permissions `600`.
-6. Run `python3 scripts/sjtu_meeting.py whoami` to verify.
-
-Do not ask for the user's jAccount password, do not print the token, and do not extract credentials from third-party or unconsented browser sessions. See `docs/credential-setup.md` and `docs/agent-cookie-capture.zh.md`.
-
-## Safety Rules
-
-- `delete` is irreversible; always list and confirm IDs before deletion.
-- Batch creation creates real external records; dry-run and confirm first.
-- The CLI intentionally does not expose mail-sending, admin, or clearing endpoints.
-- Never publish `user_token`, cookies, account passwords, or real private meeting templates.
-
-## Platform Constraints
-
-- Start time must be on the hour or half-hour: `HH:00` or `HH:30`.
-- Duration is normalized to 30-minute increments and capped at 24 hours.
-- Common room groups: `14` = 50 people, `11` = 300 people, `12` = 2000 people with review, `13` = 2026 300-person group.
-
-## Implementation Notes
-
-- All wrapped endpoints are under `https://meeting.sjtu.edu.cn/api/v1`.
-- Requests are `POST` with `application/x-www-form-urlencoded` payloads.
-- The token is sent in both the `user-token` header and the `user_token` body field.
-- `create` parses the notice URL returned by `meeting/edit` to extract the Tencent join URL and meeting number.
-- `list` defaults to future meetings for one year to avoid old historical records.
-- Batch creation and deletion use a small thread pool with default concurrency 4.
+- Never ask for or store the user's jAccount password.
+- Never print `user_token` in chat, logs, commits, issues, screenshots, or final answers.
+- Do not call `meeting/mail/*`, `admin/*`, `user/clear`, or other risky routes directly.
+- Use the exposed CLI/backend operations rather than inventing raw API calls unless extending the skill deliberately.

@@ -40,10 +40,11 @@ agent 会负责：
 ## 仓库结构
 
 - `SKILL.md`：给 agent 读取的 skill 说明，定义何时触发、如何把自然语言请求映射到操作。
+- `agents/openai.yaml`：skill 的 UI 元数据。
 - `scripts/sjtu_meeting.py`：agent 内部使用的 Python CLI 后端。
-- `docs/agent-cookie-capture.zh.md`：用户自己的 agent 如何从已登录浏览器安全抓取 token。
-- `docs/credential-setup.md`：凭证、登录态、刷新和排障说明。
-- `docs/cli-reference.zh.md`：CLI 命令参考，主要给 agent/维护者调试用。
+- `references/agent-cookie-capture.zh.md`：用户自己的 agent 如何从已登录浏览器安全抓取 token。
+- `references/credential-setup.md`：凭证、登录态、刷新和排障说明。
+- `references/cli-reference.zh.md`：CLI 命令参考，主要给 agent/维护者调试用。
 - `references/api.md`：后端 API 逆向说明。
 - `assets/recurring_meetings.json`：公开示例 recurring 会议模板。
 - `examples/creds.example.json`：凭据文件示例，不包含真实 token。
@@ -94,7 +95,7 @@ agent 的执行原则：
 - 如果还在 SSO 登录页，停下来让用户自己登录，不要索要密码。
 - 写入本地凭据文件后，只汇报验证结果，不回显 token。
 
-详细的浏览器 token 抓取流程见 [docs/agent-cookie-capture.zh.md](docs/agent-cookie-capture.zh.md)。
+详细的浏览器 token 抓取流程见 [references/agent-cookie-capture.zh.md](references/agent-cookie-capture.zh.md)。
 
 ## Agent 如何使用这个 Skill
 
@@ -107,7 +108,7 @@ agent 看到用户要求在 SJTU 云视频会议平台上创建、查询、删�
 3. 调用内部 CLI/API 完成操作。
 4. 返回用户真正关心的结果，例如会议号、腾讯入会链接、创建成功数、删除结果或占用时段。
 
-用户不需要阅读 CLI 参数。CLI 命令参考保留在 [docs/cli-reference.zh.md](docs/cli-reference.zh.md)，用于维护、调试或扩展 skill。
+用户不需要阅读 CLI 参数。CLI 命令参考保留在 [references/cli-reference.zh.md](references/cli-reference.zh.md)，用于维护、调试或扩展 skill。
 
 ## 安全边界
 

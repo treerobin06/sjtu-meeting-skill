@@ -1,0 +1,4 @@
+interface:
+  display_name: "SJTU Meeting"
+  short_description: "Manage SJTU meetings with natural language"
+  default_prompt: "Use $sjtu-meeting to create or query my SJTU cloud video meetings from natural language."
