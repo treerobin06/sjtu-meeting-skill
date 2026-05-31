@@ -1,0 +1,26 @@
+{
+  "skill_name": "sjtu-meeting",
+  "evals": [
+    {
+      "id": 0,
+      "name": "list-future",
+      "prompt": "帮我看看从今天起一个月内，我在交大云视频会议上有哪些会，列出来给我",
+      "expected_output": "调用 sjtu-meeting CLI 的 list 命令，返回未来一个月会议清单（时间/主题/会议号/状态），不去模拟浏览器 UI",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "create-single",
+      "prompt": "在交大云视频会议帮我建个会，主题叫『方案测试会』，2026年12月29号晚上11点，开半小时，密码默认就行，不用加联席主持人",
+      "expected_output": "调用 create，date=2026-12-29 time=23:00（半点合法）duration=0.5 小时，返回会议号+腾讯入会链接",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "get-join-link",
+      "prompt": "我接下来最近的那个会，腾讯会议入会链接和会议号发我一下",
+      "expected_output": "list 找到最近的会 → get 拿 join_url，返回入会链接（meeting.tencent.com/dm/...）+ 会议号",
+      "files": []
+    }
+  ]
+}

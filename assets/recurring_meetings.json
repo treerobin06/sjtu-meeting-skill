@@ -1,0 +1,21 @@
+{
+  "_note": "Public example weekly meeting template. Replace names, cohosts, and schedule with your own values.",
+  "default_weeks": 8,
+  "shared": {
+    "cohost": "",
+    "password": "000000",
+    "duration_hours": 1,
+    "group_id": 14
+  },
+  "default_batch": ["WEEKLY_SEMINAR", "PROJECT_SYNC"],
+  "meetings": {
+    "WEEKLY_SEMINAR": {
+      "weekday": 2,
+      "time": "19:00"
+    },
+    "PROJECT_SYNC": {
+      "weekday": 5,
+      "time": "10:00"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "user_token": "paste-token-here",
+  "name": "Your Name",
+  "user_id": "your-jaccount",
+  "email": "your-jaccount@sjtu.edu.cn",
+  "allow_room_group": [14, 11],
+  "default_group_id": 14,
+  "default_cohost": "",
+  "default_password": "000000",
+  "base_url": "https://meeting.sjtu.edu.cn/api/v1",
+  "_note": "Do not commit your real user_token. Store the real file at ~/.config/sjtu-meeting/creds.json or set SJTU_MEETING_CREDS."
+}

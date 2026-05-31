@@ -1,0 +1,1 @@
+"""SJTU meeting CLI package."""

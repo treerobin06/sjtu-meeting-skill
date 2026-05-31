@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.venv/
+venv/
+
+# Local credentials and private templates
+creds.json
+*.creds.json
+local-creds.json
+sjtu-meeting-creds.json
+private/
+local/
