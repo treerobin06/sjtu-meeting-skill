@@ -76,13 +76,14 @@ The token comes from the logged-in browser's `user_info` cookie on `meeting.sjtu
 
 For a new user's agent setup:
 
-1. Ask the user to open `https://meeting.sjtu.edu.cn` and complete normal SSO login themselves.
-2. Read only the `user_info` cookie from that origin in the logged-in browser context.
-3. Extract the `token` field.
-4. Write it to `~/.config/sjtu-meeting/creds.json` with permissions `600`.
-5. Run `python3 scripts/sjtu_meeting.py whoami` to verify.
+1. Ask the user to open `https://meeting.sjtu.edu.cn` in their own browser and complete normal SSO login themselves.
+2. Attach to the user's existing logged-in browser/profile. Do not use a fresh stateless browser.
+3. If the page is not logged in, stop and ask the user to log in manually. Do not ask for a password.
+4. In the `meeting.sjtu.edu.cn` page context only, read the `user_info` cookie and extract the `token` field.
+5. Write it to `~/.config/sjtu-meeting/creds.json` with permissions `600`.
+6. Run `python3 scripts/sjtu_meeting.py whoami` to verify.
 
-Do not ask for the user's jAccount password, do not print the token, and do not extract credentials from third-party or unconsented browser sessions. See `docs/credential-setup.md`.
+Do not ask for the user's jAccount password, do not print the token, and do not extract credentials from third-party or unconsented browser sessions. See `docs/credential-setup.md` and `docs/agent-cookie-capture.zh.md`.
 
 ## Safety Rules
 

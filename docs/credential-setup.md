@@ -110,6 +110,8 @@ python3 scripts/sjtu_meeting.py whoami
 
 Use this when the user's coding agent can inspect or automate the user's already logged-in browser. The agent should not receive the password.
 
+For a more detailed Chinese guide written directly for browser-capable agents, see [agent-cookie-capture.zh.md](agent-cookie-capture.zh.md).
+
 User steps:
 
 1. Open `https://meeting.sjtu.edu.cn`.

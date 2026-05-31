@@ -31,6 +31,7 @@
 - `SKILL.md`：给 agent 使用的 skill 说明。
 - `references/api.md`：后端接口、payload、response 和安全边界说明。
 - `docs/credential-setup.md`：登录态和凭证获取的详细说明。
+- `docs/agent-cookie-capture.zh.md`：给用户自己的 agent 自动抓取已登录浏览器 token 的中文操作手册。
 - `assets/recurring_meetings.json`：公开示例 recurring 会议模板。
 - `examples/creds.example.json`：凭据文件示例，不包含真实 token。
 
@@ -84,7 +85,13 @@ chmod 600 ~/.config/sjtu-meeting/creds.json
 
 ## 给陌生用户和 Agent 的凭证设置流程
 
-推荐流程是“用户自己登录，agent 只读取授权后的浏览器登录态”，不需要把 jAccount 密码交给 agent。
+推荐流程是“用户自己登录，agent 只读取授权后的浏览器登录态”，不需要把 jAccount 密码交给 agent。详细版见 [docs/agent-cookie-capture.zh.md](docs/agent-cookie-capture.zh.md)。
+
+前提：
+
+- 用户本机已经有浏览器，并且 agent 有权限访问这个浏览器或它的调试接口。
+- 用户已经在该浏览器里登录 `https://meeting.sjtu.edu.cn`，或者愿意在 agent 提示后手动登录。
+- agent 必须 attach 到用户已有登录态的浏览器/profile；如果开的是全新无状态浏览器，就拿不到 cookie。
 
 1. 用户在自己的浏览器打开 `https://meeting.sjtu.edu.cn`。
 2. 用户自己完成 SJTU SSO 登录。
@@ -96,22 +103,40 @@ chmod 600 ~/.config/sjtu-meeting/creds.json
 可以给 agent 的提示词：
 
 ```text
-我已经在本机浏览器登录 https://meeting.sjtu.edu.cn。请只从该 origin 的 user_info cookie 中提取 token 字段。不要问我要密码，不要在聊天或日志中打印 token。把它写入 ~/.config/sjtu-meeting/creds.json，权限设为 600，然后运行 `python3 scripts/sjtu_meeting.py whoami` 验证。
+我已经在本机浏览器登录 https://meeting.sjtu.edu.cn，并允许你访问这个已登录浏览器的页面上下文。
+请 attach 到这个已有浏览器/profile，不要新开无登录态的浏览器。
+如果页面没有登录，请停下来让我手动登录；不要问我要 jAccount 密码。
+登录后，只在 https://meeting.sjtu.edu.cn 这个 origin 中读取 user_info cookie，解析其中的 token 字段。
+不要在聊天、日志、commit、issue 或最终回复中打印 token。
+把 token 写入 ~/.config/sjtu-meeting/creds.json，权限设为 600，然后运行 `python3 scripts/sjtu_meeting.py whoami` 验证。
+最终只告诉我验证是否成功，以及识别到的非敏感账号信息；不要回显 token。
 ```
 
-手动浏览器控制台提取方式：
+agent 在浏览器页面上下文中执行的核心 JS：
 
 ```js
 (() => {
+  if (location.hostname !== "meeting.sjtu.edu.cn") {
+    throw new Error(`wrong origin: ${location.origin}`);
+  }
   const m = document.cookie.match(/(?:^|;\s*)user_info=([^;]+)/);
   if (!m) throw new Error("user_info cookie not found; log in to meeting.sjtu.edu.cn first");
   let o = JSON.parse(decodeURIComponent(m[1]));
   if (typeof o === "string") o = JSON.parse(o);
-  return o.token;
+  if (!o.token) throw new Error("token not found in user_info cookie");
+  return {
+    token: o.token,
+    profile: {
+      name: o.name || "",
+      user_id: o.user_id || "",
+      email: o.email || "",
+      allow_room_group: o.allow_room_group || []
+    }
+  };
 })()
 ```
 
-然后把返回值写入 `~/.config/sjtu-meeting/creds.json`：
+agent 只需要把返回对象里的 `token` 写入 `~/.config/sjtu-meeting/creds.json`；`profile` 只是用于本地核对，不应包含在公开日志里。
 
 ```json
 {
