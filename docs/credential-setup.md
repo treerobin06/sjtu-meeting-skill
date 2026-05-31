@@ -11,6 +11,16 @@ The safe model is:
 
 Do not use this workflow on someone else's account, browser profile, or machine without explicit consent.
 
+Why this is safer than storing a password:
+
+- The user's account password is never given to the agent.
+- Login still happens through the official SJTU SSO page in the user's browser.
+- The saved value is a session-like API token, not the account password.
+- If the token expires, the user logs in again and the agent refreshes the token. No password reset or account change is involved.
+- The local credential file can be deleted at any time to revoke this tool's local access.
+
+The main thing to protect is the token itself. Do not print it in chats, logs, issues, commits, or screenshots.
+
 ## What The Token Is
 
 After login, `meeting.sjtu.edu.cn` sets a `user_info` cookie. In the observed web app, this cookie is not `HttpOnly`, so JavaScript running on the meeting site can read it. The cookie contains encoded JSON with fields such as:
@@ -31,6 +41,8 @@ The CLI needs only `token`. It sends that value as:
 - `user_token` form body field
 
 No browser cookies are required after the token has been saved locally.
+
+The token can expire with the browser session or server-side session policy. That is expected. When it expires, simply log in to `meeting.sjtu.edu.cn` again and repeat the extraction step.
 
 ## Credential File
 

@@ -46,6 +46,15 @@ CLI 会把 token 同时放在两个位置：
 
 token 来源于用户已经登录 `meeting.sjtu.edu.cn` 后，浏览器里的 `user_info` cookie。这个仓库不包含账号密码、cookie 或真实 token。
 
+这种方式的安全性来自几个边界：
+
+- 不保存、不传输、不代填 jAccount 账号密码；用户始终在学校官方 SSO 页面自己登录。
+- agent 只读取登录后 `meeting.sjtu.edu.cn` 这个站点自己的 `user_info` cookie，并且只保存其中的 `token` 字段。
+- token 保存在用户本机的本地文件里，建议权限为 `600`，不会进入仓库。
+- token 是会话型凭据。它过期后不会影响账号本身，只需要用户重新在浏览器登录一次，再让 agent 重新抓取 token 即可。
+
+换句话说，这不是“把账号密码交给脚本”，而是“复用用户已经登录好的浏览器会话”。只要不把 token 打印到公开日志、issue、commit 或聊天记录里，这种方式比保存账号密码更可控，也更适合本地 agent 自动化。
+
 凭据读取顺序：
 
 1. 命令行参数 `--token`
