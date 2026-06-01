@@ -94,31 +94,96 @@ Optional metadata can be included for local convenience:
 
 Never commit this file.
 
-## Method 1: Manual Browser Console
+## Method 1: One-Command Local Setup
+
+This is the easiest route for most collaborators. It does not require a browser plugin, Playwright, MCP, or copying cookies by hand.
+
+From the repository root:
+
+```bash
+python3 scripts/setup_chrome_token.py
+```
+
+What happens:
+
+1. The script first tries existing local DevTools ports such as `127.0.0.1:9222`, `9223`, and `9224`.
+2. If an existing Chrome/Edge session is reachable and already logged in to `meeting.sjtu.edu.cn`, the script reuses that session.
+3. If no usable existing session is found, the script opens a dedicated local Chrome/Edge profile with DevTools enabled on `127.0.0.1`.
+4. You complete the official SJTU SSO login in that browser window.
+5. The script waits until `meeting.sjtu.edu.cn` is loaded.
+6. The script reads only the `user_info` cookie from that origin, extracts only `token`, and does not print it.
+7. The script writes `~/.config/sjtu-meeting/creds.json` with mode `600`.
+8. The script verifies the token against the meeting API.
+
+Useful options:
+
+```bash
+python3 scripts/setup_chrome_token.py --browser chrome
+python3 scripts/setup_chrome_token.py --browser edge
+python3 scripts/setup_chrome_token.py --timeout 300
+python3 scripts/setup_chrome_token.py --creds /path/to/creds.json
+python3 scripts/setup_chrome_token.py --skip-existing
+```
+
+If you already started Chrome/Edge with a local DevTools port, you can attach instead of launching a new browser:
+
+```bash
+python3 scripts/setup_chrome_token.py --attach-port 9222
+```
+
+The default launched browser uses a dedicated profile at `~/.config/sjtu-meeting/browser-profile`, so it does not need to control or modify your everyday Chrome profile.
+
+## Fallback Policy
+
+Credential setup has a strict fallback order:
+
+1. Run `python3 scripts/setup_chrome_token.py`.
+2. Let it try an already-open logged-in Chrome/Edge session through local DevTools ports.
+3. If that fails, finish login in the dedicated browser window opened by the script, return to `meeting.sjtu.edu.cn`, and refresh once.
+4. If the script still cannot read `user_info` or API verification fails, stop the automatic setup path.
+5. Use the manual DevTools method below.
+
+Do not fall back to controlling the meeting website UI to create, list, or delete meetings one by one. This skill's runtime path is the API CLI after credentials are valid. If credentials are not valid, the correct next step is credential setup, not UI automation.
+
+## Method 2: Manual DevTools Cookie Copy
 
 1. Open `https://meeting.sjtu.edu.cn`.
 2. Complete the official SJTU SSO login in your browser.
-3. Open browser developer tools on the meeting site.
-4. Run this snippet in the console:
+3. After the meeting page loads, open browser developer tools:
+   - macOS: `Cmd+Option+I`
+   - Windows/Linux: `F12` or `Ctrl+Shift+I`
+4. Preferred path:
+   - Open the `Application` tab.
+   - In the left sidebar, open `Storage` > `Cookies` > `https://meeting.sjtu.edu.cn`.
+   - Find the cookie named `user_info`.
+   - Copy its `Value`.
+5. If the `Application` tab is hard to find, use `Network` instead:
+   - Open the `Network` tab.
+   - Refresh the meeting page.
+   - Click a request under `meeting.sjtu.edu.cn/api/v1`, for example `user/incomplete`.
+   - Open `Headers` > `Request Headers`.
+   - Copy the `user_info=...` part from the `Cookie` header. Copying the full `Cookie` header is also acceptable.
+6. Create or edit `~/.config/sjtu-meeting/creds.json` and paste the copied value into `user_info_cookie`:
 
-```js
-(() => {
-  const m = document.cookie.match(/(?:^|;\s*)user_info=([^;]+)/);
-  if (!m) throw new Error("user_info cookie not found; log in to meeting.sjtu.edu.cn first");
-  let o = JSON.parse(decodeURIComponent(m[1]));
-  if (typeof o === "string") o = JSON.parse(o);
-  return o.token;
-})()
+```json
+{
+  "user_info_cookie": "PASTE_USER_INFO_COOKIE_VALUE_HERE",
+  "default_group_id": 14,
+  "default_cohost": "",
+  "default_password": "000000"
+}
 ```
 
-5. Put the returned token into `~/.config/sjtu-meeting/creds.json`.
-6. Verify:
+The CLI will parse `user_info_cookie` locally and extract the token at runtime. Do not paste the cookie into chat, issues, commits, screenshots, or public logs.
 
-```bash
-python3 scripts/sjtu_meeting.py whoami
+7. Save the file, then tell your agent:
+
+```text
+I pasted user_info_cookie into ~/.config/sjtu-meeting/creds.json.
+Please verify the SJTU meeting credential.
 ```
 
-## Method 2: Agent-Assisted Setup
+## Method 3: Agent-Assisted Setup
 
 Use this when the user's coding agent can inspect or automate the user's already logged-in browser. The agent should not receive the password.
 
@@ -153,8 +218,9 @@ The agent should stop and ask the user to log in manually if:
 - the page is not on `meeting.sjtu.edu.cn`.
 - the browser automation runtime cannot access the logged-in browser profile.
 - `whoami` reports an authentication failure.
+- the runtime tries to switch to website UI operations instead of obtaining a valid token.
 
-## Method 3: Environment Variable
+## Method 4: Environment Variable
 
 For one-off use without writing a file:
 
@@ -177,11 +243,10 @@ Refresh when:
 
 Refresh process:
 
-1. Reopen `https://meeting.sjtu.edu.cn`.
-2. Log in again if required.
-3. Re-extract the token.
-4. Replace `user_token` in the local credential file.
-5. Run `whoami`.
+1. Run `python3 scripts/setup_chrome_token.py` again.
+2. Complete login in the opened browser window if required.
+3. Let the script overwrite `user_token` in the local credential file.
+4. Run `python3 scripts/sjtu_meeting.py whoami` if you want a separate check.
 
 ## Troubleshooting
 
@@ -200,7 +265,8 @@ Refresh process:
 
 Agent cannot access the browser
 
-- Use manual browser-console extraction.
+- Use `python3 scripts/setup_chrome_token.py`.
+- Or use manual browser-console extraction.
 - Or configure the agent's approved browser automation tool to attach to the user's logged-in browser.
 - Do not give the agent your account password as a workaround.
 

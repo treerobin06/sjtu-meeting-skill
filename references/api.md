@@ -17,7 +17,17 @@
 
 ### token 刷新（过期时）
 
-token 会随登录态过期。重抓：用 edge-devtools 在登录态 Edge（:9222）打开的 meeting 站执行：
+token 会随登录态过期。最简单的重抓方式是在仓库根目录运行：
+
+```bash
+python3 scripts/setup_chrome_token.py
+```
+
+脚本会先尝试已有本机 Chrome/Edge 调试端口；如果没有可用登录态，再打开专用 Chrome/Edge 登录窗口，用户手动完成 SSO 后自动写回本地凭据文件，不打印 token。
+
+手动 DevTools fallback 也可以把 `user_info` cookie 值写到凭据文件的 `user_info_cookie` 字段；CLI 会在本地解析出 token。
+
+如果需要 agent 手动抓取，可用 edge-devtools 在登录态 Edge（:9222）打开的 meeting 站执行：
 ```js
 () => { const m = document.cookie.match(/(?:^|;\s*)user_info=([^;]+)/); let o = JSON.parse(decodeURIComponent(m[1])); if (typeof o === 'string') o = JSON.parse(o); return o.token; }
 ```

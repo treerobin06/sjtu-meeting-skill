@@ -35,6 +35,7 @@ Return what the user cares about: meeting time, topic, internal ID when needed, 
 - For batch creation or recurring meetings, dry-run or show the generated schedule before creating real records.
 - Deletion is irreversible. Always list candidate meetings and ask for confirmation before deleting.
 - If the user asks for the next meeting link, list near-future meetings first, choose the relevant meeting, then get details.
+- If credentials are missing, expired, or unverifiable, stop and complete credential setup first. Do not fall back to controlling the meeting website UI to create/list/delete meetings one by one.
 
 ## Credentials
 
@@ -42,11 +43,13 @@ The backend uses a single `user_token` saved outside the repository. The agent s
 
 For first-time setup:
 
-1. Ask the user to open `https://meeting.sjtu.edu.cn` in their own browser and complete normal SSO login.
-2. Attach to the user's existing logged-in browser/profile, not a fresh stateless browser.
-3. Read only the `user_info` cookie from `meeting.sjtu.edu.cn`, extract only `token`, and do not print it.
-4. Save it to the local credential file with permission `600`.
-5. Verify with the CLI/backend before doing meeting operations.
+1. Prefer the local helper: `python3 scripts/setup_chrome_token.py`.
+2. The helper first tries already-open local DevTools ports such as `127.0.0.1:9222` to reuse an existing logged-in Chrome/Edge session.
+3. If no usable existing browser session is found, the helper opens a dedicated Chrome/Edge profile and asks the user to complete normal SJTU SSO login there.
+4. Let the helper read only the `user_info` cookie from `meeting.sjtu.edu.cn`, extract only `token`, write the credential file with permission `600`, and verify the API.
+5. If automation still cannot read the cookie or verify the token, stop the setup attempt. Do not continue by driving the website UI for meeting operations.
+6. Offer the manual DevTools fallback in `references/credential-setup.md`: the user opens DevTools, finds `user_info` in Application > Cookies or Network > Request Headers, then pastes that cookie value into `user_info_cookie` in `~/.config/sjtu-meeting/creds.json`.
+7. Never print the token.
 
 Read `references/agent-cookie-capture.zh.md` or `references/credential-setup.md` when setting up or refreshing credentials.
 
@@ -56,6 +59,7 @@ Read `references/agent-cookie-capture.zh.md` or `references/credential-setup.md`
 - `references/api.md`: backend API payloads, responses, wrapped endpoints, and intentionally unwrapped risky endpoints.
 - `references/agent-cookie-capture.zh.md`: detailed Chinese guide for browser-capable agents to capture the logged-in token.
 - `references/credential-setup.md`: credential model, refresh, troubleshooting, and security notes.
+- `scripts/setup_chrome_token.py`: easiest first-time credential setup; launches local Chrome/Edge and writes creds without printing the token.
 
 ## Safety
 

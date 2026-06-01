@@ -6,6 +6,26 @@
 
 用户自己登录浏览器；agent attach 到这个已有登录态；agent 只在 `meeting.sjtu.edu.cn` 页面上下文读取 `user_info` cookie；agent 提取 `token` 并写入 `~/.config/sjtu-meeting/creds.json`；agent 运行 `whoami` 验证；agent 不回显 token。
 
+## 最省事的方式
+
+如果用户只是想尽快完成本机配置，优先让用户在仓库根目录运行：
+
+```bash
+python3 scripts/setup_chrome_token.py
+```
+
+这个脚本会先尝试连接本机已有的 Chrome/Edge 调试端口（例如 `127.0.0.1:9222`），如果那里已经登录 `meeting.sjtu.edu.cn`，就直接复用这份登录态。找不到可用登录态时，脚本才会自己启动一个专用 Chrome/Edge 窗口。用户在窗口里手动登录学校 SSO 后，脚本自动抓取 `meeting.sjtu.edu.cn` 的 `user_info` cookie，写入凭据文件并验证 API。整个过程不要求用户理解浏览器插件、Playwright、MCP 或 DevTools，也不会打印 token。
+
+## 失败时的降级顺序
+
+1. 自动脚本先尝试已有浏览器调试端口。
+2. 如果没有可用登录态，就让用户在脚本打开的浏览器窗口里完成登录，回到 `meeting.sjtu.edu.cn` 并刷新一次。
+3. 如果自动脚本仍然拿不到 `user_info`，停止自动路径，不要继续尝试网页 UI 操作。
+4. 让用户按 `references/credential-setup.md` 的 Method 2 打开 DevTools，在 Application/Cookies 或 Network/Headers 里复制 `user_info` cookie，自己把 cookie 值写进本地凭据文件的 `user_info_cookie` 字段。
+5. 凭据验证成功后，才继续用 API CLI 创建、查询或删除会议。
+
+禁止把“自动抓 cookie 失败”降级成“agent 直接打开网页表单，一个一个点按钮来操作会议”。那条路慢、脆弱，也绕过了本 skill 的 API 安全边界。
+
 ## 前提条件
 
 - 用户本机已经安装浏览器。
@@ -136,7 +156,7 @@ python3 scripts/sjtu_meeting.py whoami
 
 ### token 被打印到日志
 
-不同 agent runtime 的浏览器 evaluate 工具可能会把返回值写进工具日志。高敏感场景下，用户应改用手动控制台方式，或者使用自己信任的本地 agent，并确认日志不会公开上传。
+不同 agent runtime 的浏览器 evaluate 工具可能会把返回值写进工具日志。高敏感场景下，用户应改用手动 DevTools cookie 复制方式，或者使用自己信任的本地 agent，并确认日志不会公开上传。
 
 ## 安全边界
 

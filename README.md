@@ -42,6 +42,7 @@ agent 会负责：
 - `SKILL.md`：给 agent 读取的 skill 说明，定义何时触发、如何把自然语言请求映射到操作。
 - `agents/openai.yaml`：skill 的 UI 元数据。
 - `scripts/sjtu_meeting.py`：agent 内部使用的 Python CLI 后端。
+- `scripts/setup_chrome_token.py`：首次配置凭据的一键脚本，会打开本机 Chrome/Edge 登录并自动写入 token。
 - `references/agent-cookie-capture.zh.md`：用户自己的 agent 如何从已登录浏览器安全抓取 token。
 - `references/credential-setup.md`：凭证、登录态、刷新和排障说明。
 - `references/cli-reference.zh.md`：CLI 命令参考，主要给 agent/维护者调试用。
@@ -53,12 +54,20 @@ agent 会负责：
 
 这个工具不需要用户把 jAccount 账号密码交给 agent。
 
-推荐流程是：
+最简单的配置方式是在仓库根目录运行：
+
+```bash
+python3 scripts/setup_chrome_token.py
+```
+
+脚本会先尝试连接本机已经打开的 Chrome/Edge 调试端口（例如 `127.0.0.1:9222`），如果那里已经登录 `meeting.sjtu.edu.cn`，就直接复用这份登录态。找不到可用登录态时，脚本才会打开一个专用 Chrome/Edge 窗口，让用户自己完成 SJTU SSO 登录。登录成功后，脚本会读取 `meeting.sjtu.edu.cn` 的 `user_info` cookie，提取其中的 `token`，写入 `~/.config/sjtu-meeting/creds.json`，并验证 API 是否可用。脚本不会打印 token。
+
+安全流程是：
 
 1. 用户自己在浏览器打开 `https://meeting.sjtu.edu.cn`。
 2. 用户自己完成学校官方 SSO 登录。
-3. 用户授权自己的 agent 访问这个已登录浏览器的页面上下文。
-4. agent 只读取 `meeting.sjtu.edu.cn` 这个 origin 的 `user_info` cookie。
+3. 本地脚本或用户授权的 agent 只访问这个登录窗口里的页面上下文。
+4. 脚本或 agent 只读取 `meeting.sjtu.edu.cn` 这个 origin 的 `user_info` cookie。
 5. agent 只保存其中的 `token` 字段到本机凭据文件。
 6. agent 用该 token 调用会议平台 API。
 
@@ -74,9 +83,22 @@ agent 会负责：
 
 真正需要保护的是 token 本身：不要把它打印到聊天、日志、issue、commit、截图或公开文档里。
 
-## 给用户复制给 Agent 的提示词
+## 凭据设置失败时怎么办
 
-如果你的 agent 已经能访问浏览器，例如 Browser Use、Computer Use、Chrome/Edge DevTools、Playwright MCP、浏览器调试端口或类似插件，可以直接对 agent 说：
+降级顺序很简单：
+
+1. 先运行 `python3 scripts/setup_chrome_token.py`，让它尝试已有浏览器调试端口。
+2. 如果没有可用登录态，脚本会打开专用浏览器窗口，用户在里面完成登录，回到 `meeting.sjtu.edu.cn` 并刷新一次。
+3. 如果还是抓不到 cookie 或 API 验证失败，就停止自动路径。
+4. 按 [references/credential-setup.md](references/credential-setup.md) 的 Method 2 手动打开 DevTools，在 Application/Cookies 或 Network/Headers 里复制 `user_info` cookie，粘进本地凭据文件。
+
+不要把失败路径改成“agent 打开网页 UI 一个一个点按钮来创建/删除会议”。这个 skill 的运行路径是：凭据有效后直接调用 API；凭据无效时先完成凭据设置。
+
+## 如果不用脚本
+
+优先使用 `python3 scripts/setup_chrome_token.py`。它不要求用户理解 Chrome 插件、MCP、Playwright 或 DevTools。
+
+如果你的 agent 已经能稳定访问浏览器，例如 Chrome/Edge DevTools、Playwright MCP、浏览器调试端口或类似插件，也可以直接对 agent 说：
 
 ```text
 我已经在本机浏览器登录 https://meeting.sjtu.edu.cn，并允许你访问这个已登录浏览器的页面上下文。

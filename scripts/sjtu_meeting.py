@@ -47,6 +47,34 @@ ROOM_GROUPS = {
 }
 
 # ---------------------------------------------------------------- 凭据
+def parse_user_info_cookie(raw):
+    """从 user_info cookie 值或完整 Cookie header 中解析 token 和非敏感 profile。"""
+    if not raw:
+        raise ValueError("empty user_info cookie")
+    value = str(raw).strip()
+    match = re.search(r"(?:^|[;\s])user_info=([^;]+)", value)
+    if match:
+        value = match.group(1)
+    value = value.strip().strip('"').strip("'")
+    for _ in range(3):
+        decoded = unquote(value)
+        if decoded == value:
+            break
+        value = decoded
+    info = json.loads(value)
+    if isinstance(info, str):
+        info = json.loads(info)
+    if not isinstance(info, dict) or not info.get("token"):
+        raise ValueError("token not found in user_info cookie")
+    profile = {
+        "name": info.get("name") or "",
+        "user_id": info.get("user_id") or "",
+        "email": info.get("email") or "",
+        "allow_room_group": info.get("allow_room_group") or [],
+    }
+    return info["token"], profile
+
+
 def load_creds(token_override=None):
     creds = {}
     if os.path.exists(CREDS_PATH):
@@ -57,10 +85,23 @@ def load_creds(token_override=None):
             sys.exit(f"读取凭据文件失败 {CREDS_PATH}: {e}")
     token = token_override or os.environ.get("SJTU_MEETING_TOKEN") or creds.get("user_token")
     if not token:
+        raw_user_info = (
+            os.environ.get("SJTU_MEETING_USER_INFO")
+            or creds.get("user_info_cookie")
+            or creds.get("user_info")
+        )
+        if raw_user_info:
+            try:
+                token, profile = parse_user_info_cookie(raw_user_info)
+                for k, v in profile.items():
+                    creds.setdefault(k, v)
+            except Exception as e:
+                sys.exit(f"解析 user_info_cookie 失败: {e}")
+    if not token:
         sys.exit(
             "没有 user_token。请用 --token 指定，或写入 "
             + CREDS_PATH
-            + "（字段 user_token）。token = 浏览器 user_info cookie 的 token 字段。"
+            + "（字段 user_token；也可写 user_info_cookie 让 CLI 自动解析）。"
         )
     creds["user_token"] = token
     return creds

@@ -1,5 +1,6 @@
 {
   "user_token": "paste-token-here",
+  "user_info_cookie": "optional-paste-user-info-cookie-value-here",
   "name": "Your Name",
   "user_id": "your-jaccount",
   "email": "your-jaccount@sjtu.edu.cn",
@@ -8,5 +9,5 @@
   "default_cohost": "",
   "default_password": "000000",
   "base_url": "https://meeting.sjtu.edu.cn/api/v1",
-  "_note": "Do not commit your real user_token. Store the real file at ~/.config/sjtu-meeting/creds.json or set SJTU_MEETING_CREDS."
+  "_note": "Do not commit your real user_token or user_info_cookie. Store the real file at ~/.config/sjtu-meeting/creds.json or set SJTU_MEETING_CREDS. user_token is preferred; user_info_cookie is accepted for manual DevTools fallback."
 }
