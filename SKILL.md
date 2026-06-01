@@ -48,8 +48,16 @@ For first-time setup:
 3. If no usable existing browser session is found, the helper opens a dedicated Chrome/Edge profile and asks the user to complete normal SJTU SSO login there.
 4. Let the helper read only the `user_info` cookie from `meeting.sjtu.edu.cn`, extract only `token`, write the credential file with permission `600`, and verify the API.
 5. If automation still cannot read the cookie or verify the token, stop the setup attempt. Do not continue by driving the website UI for meeting operations.
-6. Offer the manual DevTools fallback in `references/credential-setup.md`: the user opens DevTools, finds `user_info` in Application > Cookies or Network > Request Headers, then pastes that cookie value into `user_info_cookie` in `~/.config/sjtu-meeting/creds.json`.
+6. Offer the manual DevTools fallback in `references/credential-setup.md`: the user opens DevTools, finds `user_info` in Application > Cookies or Network > Request Headers, then either pastes that value into the local agent chat or writes it into `user_info_cookie` in `~/.config/sjtu-meeting/creds.json`.
 7. Never print the token.
+
+If the user pastes a `user_info` cookie into chat, treat it as a secret. Do not echo it. Import it through stdin, not a command-line argument:
+
+```bash
+python3 scripts/sjtu_meeting.py import-cookie
+```
+
+Then send the pasted value to stdin, verify the result, and report only success/failure plus non-sensitive account metadata.
 
 Read `references/agent-cookie-capture.zh.md` or `references/credential-setup.md` when setting up or refreshing credentials.
 

@@ -163,7 +163,21 @@ Do not fall back to controlling the meeting website UI to create, list, or delet
    - Click a request under `meeting.sjtu.edu.cn/api/v1`, for example `user/incomplete`.
    - Open `Headers` > `Request Headers`.
    - Copy the `user_info=...` part from the `Cookie` header. Copying the full `Cookie` header is also acceptable.
-6. Create or edit `~/.config/sjtu-meeting/creds.json` and paste the copied value into `user_info_cookie`:
+6. Easiest if you are using a trusted local agent: paste the copied value into the agent chat and say:
+
+```text
+Please import this SJTU meeting user_info cookie, verify it, and do not echo the cookie.
+```
+
+The agent should import it through stdin, not as a command-line argument:
+
+```bash
+python3 scripts/sjtu_meeting.py import-cookie
+```
+
+Do this only with a trusted local agent. If the chat transcript is shared, uploaded, public, or handled by someone else's agent, use the file method below instead.
+
+7. File method: create or edit `~/.config/sjtu-meeting/creds.json` and paste the copied value into `user_info_cookie`:
 
 ```json
 {
@@ -176,7 +190,7 @@ Do not fall back to controlling the meeting website UI to create, list, or delet
 
 The CLI will parse `user_info_cookie` locally and extract the token at runtime. Do not paste the cookie into chat, issues, commits, screenshots, or public logs.
 
-7. Save the file, then tell your agent:
+8. Save the file, then tell your agent:
 
 ```text
 I pasted user_info_cookie into ~/.config/sjtu-meeting/creds.json.

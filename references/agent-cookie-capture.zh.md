@@ -21,8 +21,10 @@ python3 scripts/setup_chrome_token.py
 1. 自动脚本先尝试已有浏览器调试端口。
 2. 如果没有可用登录态，就让用户在脚本打开的浏览器窗口里完成登录，回到 `meeting.sjtu.edu.cn` 并刷新一次。
 3. 如果自动脚本仍然拿不到 `user_info`，停止自动路径，不要继续尝试网页 UI 操作。
-4. 让用户按 `references/credential-setup.md` 的 Method 2 打开 DevTools，在 Application/Cookies 或 Network/Headers 里复制 `user_info` cookie，自己把 cookie 值写进本地凭据文件的 `user_info_cookie` 字段。
-5. 凭据验证成功后，才继续用 API CLI 创建、查询或删除会议。
+4. 让用户按 `references/credential-setup.md` 的 Method 2 打开 DevTools，在 Application/Cookies 或 Network/Headers 里复制 `user_info` cookie。
+5. 如果这是用户信任的本地 agent，用户可以把 cookie 直接粘到对话框；agent 必须把它当 secret，通过 `python3 scripts/sjtu_meeting.py import-cookie` 的 stdin 导入，不要用命令行参数，不要回显。
+6. 如果对话会共享、上传、公开或由他人 agent 处理，就不要粘到聊天里，改为写进本地凭据文件的 `user_info_cookie` 字段。
+7. 凭据验证成功后，才继续用 API CLI 创建、查询或删除会议。
 
 禁止把“自动抓 cookie 失败”降级成“agent 直接打开网页表单，一个一个点按钮来操作会议”。那条路慢、脆弱，也绕过了本 skill 的 API 安全边界。
 

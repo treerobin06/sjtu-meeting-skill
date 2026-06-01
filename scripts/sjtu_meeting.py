@@ -107,6 +107,26 @@ def load_creds(token_override=None):
     return creds
 
 
+def save_creds(creds):
+    directory = os.path.dirname(CREDS_PATH)
+    if directory:
+        os.makedirs(directory, mode=0o700, exist_ok=True)
+        try:
+            os.chmod(directory, 0o700)
+        except OSError:
+            pass
+    tmp = f"{CREDS_PATH}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(creds, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, CREDS_PATH)
+    try:
+        os.chmod(CREDS_PATH, 0o600)
+    except OSError:
+        pass
+
+
 # ---------------------------------------------------------------- HTTP
 class AuthError(RuntimeError):
     pass
@@ -219,6 +239,69 @@ def cmd_whoami(args):
     groups = ", ".join(f"{g}={ROOM_GROUPS.get(g, '?')}" for g in (info["allow_room_group"] or []))
     print(f"可用会议室组: {groups}")
     return info
+
+
+def cmd_import_cookie(args):
+    if args.file:
+        with open(os.path.expanduser(args.file), "r", encoding="utf-8") as f:
+            raw = f.read()
+    else:
+        raw = sys.stdin.read()
+    raw = raw.strip()
+    if not raw:
+        sys.exit("没有读取到 user_info cookie。请从 stdin 粘贴，或用 --file 指定文件。")
+    try:
+        token, profile = parse_user_info_cookie(raw)
+    except Exception as e:
+        sys.exit(f"解析 user_info cookie 失败: {e}")
+
+    creds = {}
+    if os.path.exists(CREDS_PATH):
+        try:
+            with open(CREDS_PATH, encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                creds = loaded
+        except Exception:
+            creds = {}
+    creds.update(profile)
+    creds["user_token"] = token
+    creds.pop("user_info_cookie", None)
+    creds.setdefault("default_group_id", 14)
+    creds.setdefault("default_cohost", "")
+    creds.setdefault("default_password", "000000")
+    save_creds(creds)
+
+    verify_ok = None
+    incomplete_count = None
+    if not args.no_verify:
+        try:
+            j = api(token, "/user/incomplete", {})
+            verify_ok = ok(j)
+            incomplete_count = (j or {}).get("data")
+        except Exception:
+            verify_ok = False
+
+    result = {
+        "written": True,
+        "path": CREDS_PATH,
+        "name": creds.get("name"),
+        "user_id": creds.get("user_id"),
+        "email": creds.get("email"),
+        "token_valid": verify_ok,
+        "incomplete_count": incomplete_count,
+    }
+    if args.json:
+        return out(result, True)
+    print(f"已写入凭据文件：{CREDS_PATH}")
+    print("权限已设置为 600；token/cookie 未打印。")
+    print(f"账号: {creds.get('name') or 'unknown'} ({creds.get('user_id') or 'unknown'}) {creds.get('email') or ''}".rstrip())
+    if args.no_verify:
+        print("已跳过 API 验证。")
+    else:
+        status = "✓ 有效" if verify_ok else "✗ 可能失效"
+        print(f"token: {status}   待办: {incomplete_count}")
+    return result
 
 
 def cmd_list(args):
@@ -521,6 +604,12 @@ def build_parser():
 
     sp = add_sub("whoami", help="验证 token + 显示账户信息")
     sp.set_defaults(func=cmd_whoami)
+
+    sp = sub.add_parser("import-cookie", help="从 stdin 或文件导入 user_info cookie，写入本地凭据，不打印 token")
+    sp.add_argument("--json", action="store_true", default=False, help="输出结构化 JSON")
+    sp.add_argument("--file", help="从文件读取 user_info cookie；默认从 stdin 读取")
+    sp.add_argument("--no-verify", action="store_true", help="只写凭据，不调用 API 验证")
+    sp.set_defaults(func=cmd_import_cookie)
 
     sp = add_sub("list", help="列出我的会议")
     sp.add_argument("--search", help="主题关键词")

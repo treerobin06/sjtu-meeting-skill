@@ -90,7 +90,8 @@ python3 scripts/setup_chrome_token.py
 1. 先运行 `python3 scripts/setup_chrome_token.py`，让它尝试已有浏览器调试端口。
 2. 如果没有可用登录态，脚本会打开专用浏览器窗口，用户在里面完成登录，回到 `meeting.sjtu.edu.cn` 并刷新一次。
 3. 如果还是抓不到 cookie 或 API 验证失败，就停止自动路径。
-4. 按 [references/credential-setup.md](references/credential-setup.md) 的 Method 2 手动打开 DevTools，在 Application/Cookies 或 Network/Headers 里复制 `user_info` cookie，粘进本地凭据文件。
+4. 按 [references/credential-setup.md](references/credential-setup.md) 的 Method 2 手动打开 DevTools，在 Application/Cookies 或 Network/Headers 里复制 `user_info` cookie。
+5. 如果使用的是可信本地 agent，可以把 cookie 粘到对话框，让 agent 通过 `import-cookie` 导入；如果对话会共享、上传或公开，就改为粘进本地凭据文件。
 
 不要把失败路径改成“agent 打开网页 UI 一个一个点按钮来创建/删除会议”。这个 skill 的运行路径是：凭据有效后直接调用 API；凭据无效时先完成凭据设置。
 

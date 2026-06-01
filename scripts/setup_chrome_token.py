@@ -608,7 +608,11 @@ Example shape:
   "default_password": "000000"
 }}
 
-8. Save the file, then tell your agent:
+8. Easiest if you are using a trusted local agent: paste the copied value into the agent chat and say:
+
+Please import this SJTU meeting user_info cookie with `python3 scripts/sjtu_meeting.py import-cookie`, verify it, and do not echo the cookie.
+
+Alternative: save the file yourself, then tell your agent:
 
 I pasted user_info_cookie into {creds_path}. Please verify the SJTU meeting credential.
 
